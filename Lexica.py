@@ -4,14 +4,14 @@ import ply.lex as lex
 
 reserved = {
 	'se' : 'SE',
-	'entao' : 'ENTAO',
-	'senao' : 'SENAO',
+	'então' : 'ENTAO',
+	'senão' : 'SENAO',
 	'fim' : 'FIM',
 	'repita' : 'REPITA',
 	'flutuante' : 'FLUTUANTE',
 	'retorna' : 'RETORNA',
 	'leia' : 'LEIA',
-	'ate' : 'ATE',
+	'até' : 'ATE',
 	'escreva' : 'ESCREVA',
 	'inteiro' : 'INTEIRO',
 	'principal' : 'PRINCIPAL'
@@ -32,12 +32,10 @@ tokens = [
 	'ABREPAR',
 	'FECHAPAR',
 	'DOISPONTOS',
-	'DOISPONTOS',
 	'ABRECOL',
 	'FECHACOL',
 	'ELOGICO',
 	'NEGACAO',
-	'NUMERO',
 	'IDENTIFICADOR',
 	'COMENTARIO',
 ] + reserved.values()
@@ -63,13 +61,18 @@ t_ELOGICO = r'\&\&'
 t_NEGACAO = r'\!'
 
 
-def t_NUMERO(t):
-	r'\d+'
+def t_FLUTUANTE(t):
+	r'[+-]?\d+\.\d+'
+	t.value = int(t.value)
+	return t
+
+def t_INTEIRO(t):
+	r'[+-]?\d+'
 	t.value = int(t.value)
 	return t
 
 def t_IDENTIFICADOR(t):
-    r'[a-zA-Z][a-zA-Z_0-9]*'
+    r'[a-zA-Z][a-zA-Z_0-9à-ú]*'
     t.type = reserved.get(t.value,'IDENTIFICADOR')
     return t
 
