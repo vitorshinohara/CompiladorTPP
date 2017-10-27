@@ -2,41 +2,43 @@
 
 import ply.yacc as yacc
 import sys
-import Lexica as Lexica
-
+from Lexica import Lexica
+from graphviz import Digraph
 
 class Tree:
 
-    def __init__(self, type_node, child=[], value=''):
-        self.type = type_node
-        self.child = child
-        self.value = value
+	def __init__(self, type_node, child=[], value=''):
+		self.type = type_node
+		self.child = child
+		self.value = value
 
-    def __str__(self):
-        return self.type
+	def __str__(self):
+		return self.type
 
 ########################
 # Analisador Sintático #
 ########################
-class Sintatica:
+class Parser:
 
 	def __init__(self, code):
 		lexica = Lexica()
 		self.tokens = lexica.tokens
 		self.precedence = (
-            ('left', 'IGUALDADE', 'NEGACAO', 'MAIORIGUAL', 'MAIOR', 'MENORIGUAL', 'MENOR'),
-            ('left', 'SOMA', 'SUBTRACAO'),
-            ('left', 'MULTIPLICACAO', 'DIVISAO'),
-        )
-        parser = yacc.yacc(debug=False, module=self, optimize=False)
-        self.ast = parser.parse(code)
-
+			('left', 'IGUALDADE', 'NEGACAO', 'MAIORIGUAL', 'MAIOR', 'MENORIGUAL', 'MENOR'),
+			('left', 'SOMA', 'SUBTRACAO'),
+			('left', 'MULTIPLICACAO', 'DIVISAO'),
+		)
+		parser = yacc.yacc(debug=False, module=self, optimize=False)
+		self.ast = parser.parse(code)
+		
 	def p_programa(self, p):
+
 	 	'''
 	 	programa : lista_declaracoes
-	 	'''
-	 	p[0] = Tree('programa',[p[1]])
-
+	 		 	'''
+	 	p[0] = Tree('programa' ,[p[1]])
+	 
+	 	
 	def p_lista_declaracoes(self, p):
 	 	'''
 	 	lista_declaracoes : lista_declaracoes declaracao
@@ -44,8 +46,10 @@ class Sintatica:
 	 	'''
 	 	if (len(p) == 3):
 	 		p[0] = Tree('lista_declaracoes',[p[1], p[2]])
+	 		
 	 	elif(len(p) == 2):
 	 		p[0] = Tree('lista_declaracoes',[p[1]])
+
 
 	def p_declaracao(self, p):
 	 	'''
@@ -54,10 +58,11 @@ class Sintatica:
 					| declaracao_funcao
 	 	'''
 	 	p[0] = Tree('declaracao', [p[1]])
+	 	
 
 	def p_declaracao_variaveis(self, p):
 	 	'''
-		declaracao_variaveis : tipo ":" lista_variaveis 	
+		declaracao_variaveis : tipo DOISPONTOS lista_variaveis 	
 	 	'''
 	 	p[0] = Tree('declaracao_variaveis',[p[1], p[3]], p[2])
 
@@ -69,25 +74,27 @@ class Sintatica:
 
 	def p_lista_variaveis(self, p):
 	 	'''
-	 	lista_variaveis : lista_variaveis "," var
+	 	lista_variaveis : lista_variaveis VIRGULA var
 	 	 	 	 		| var
 		'''
 		if (len(p) == 4):
 			p[0] = Tree('lista_variaveis',[p[1], p[3]])
+			
 		elif(len(p) == 2):
-			p[0] = Tree('lista_variaveis',[p[1]])
+			p[0] = Tree('lista_variaveis',[p[1]])			
 
 	def p_var(self, p):
 	 	'''
-	    var : IDENTIFICADOR
-	    	| IDENTIFICADOR indice
-	    '''
-	    if (len(p) == 2):
-	    	p[0] = Tree('var', [], p[1])
-	    elif(len(p) == 3):
-	    	p[0] = Tree('var', [p[2]], p[1])
+		var : IDENTIFICADOR
+			| IDENTIFICADOR indice
+		'''
 
-
+		if (len(p) == 2):
+			p[0] = Tree('var', [], p[1])
+	 		
+		elif(len(p) == 3):
+			p[0] = Tree('var', [p[2]], p[1])
+	 		
 	def p_indice(self, p):
 	 	'''
 	 	indice : indice ABRECOL expressao FECHACOL
@@ -100,55 +107,69 @@ class Sintatica:
 
 	def p_tipo(self, p):
 	 	'''
-	 	tipo : inteiro
-	 		| flutuante
+	 	tipo : INTEIRO
 	 	'''
-	 	p[0] = Tree('tipo', [p[1]])
+	 	p[0] = Tree('inteiro', [])
+	 	
+	
+	def p_tipo2(self, p):
+	 	'''
+	 	tipo : FLUTUANTE
+	 	'''
+	 	
+	 	p[0] = Tree('flutuante', [])
+ 		
 
-	 def p_declaracao_funcao(self, p):
+	def p_declaracao_funcao(self, p):
 	 	'''
 	 	declaracao_funcao : tipo cabecalho
 	 						| cabecalho
 	 	'''
+	 	
 	 	if len(p) == 3:
 	 		p[0] = Tree('declaracao_funcao', [p[1],p[2]])
 	 	elif len(p) == 2:
 	 		p[0] = Tree('declaracao_funcao',[p[1]])
 
-	 def p_cabecalho(self, p):
+	def p_cabecalho(self, p):
 	 	'''
 	 	cabecalho : IDENTIFICADOR ABREPAR lista_parametros FECHAPAR corpo FIM
 	 	'''
+	 	
 	 	p[0] = Tree('cabecalho', [p[3],p[5]],p[1])
 
-	 def p_lista_parametros(self, p):
+	def p_lista_parametros(self, p):
 	 	'''
-	 	lista_parametros : lista_parametros "," lista_parametros
+	 	lista_parametros : lista_parametros VIRGULA lista_parametros
 	 						| parametro
 	 						| vazio
 	 	'''
+	 	
 	 	if len(p) == 4:
 	 		p[0] = Tree('lista_parametros',[p[1],p[3]])
 	 	elif len(p) == 2:
 	 		p[0] = Tree('lista_parametros',[p[1]])
 
-	 def p_parametro1(self, p):
+	def p_parametro1(self, p):
 	 	'''
-	 	parametro : tipo ":" IDENTIFICADOR
+	 	parametro : tipo DOISPONTOS IDENTIFICADOR
 	 	'''
- 		p[0] = Tree('parametro', [p[1]], p[3])
+	 	
+ 		p[0] = Tree('parametro', [p[1]], p[3]) 		
 
  	def p_parametro2(self, p):
  		'''
  		parametro : parametro ABRECOL FECHACOL
  		'''
+ 		
  		p[0] = Tree('parametro', [p[1]])
-
+ 		
  	def p_corpo(self, p):
  		'''
  		corpo : corpo acao
  				| vazio
  		'''
+ 		
  		if len(p) == 3:
  			p[0] = Tree('corpo', [p[1],p[2]])
  		elif len(p) == 2:
@@ -163,19 +184,18 @@ class Sintatica:
  				| leia
  				| escreva
  				| retorna
- 				| escreva
- 				| retorna
- 				|erro
+ 				| error
 
  		'''
-
+ 		
 		p[0] = Tree('acao', [p[1]])
-
+ 		
 	def p_se(self, p):
  		'''
  		se : SE expressao ENTAO corpo FIM
  			| SE expressao ENTAO corpo SENAO corpo FIM
  		'''
+ 		
  		if len(p) == 6:
  			p[0] = Tree('se', [p[2], p[4]])
  		elif len(p) == 8:
@@ -183,25 +203,24 @@ class Sintatica:
 
  	def p_repita(self, p):
  		'''
- 		repita : REPITA corpo ATE expressa
+ 		repita : REPITA corpo ATE expressao
  		'''
 		p[0] = Tree('repita', [p[2], p[4]])
  	
  	def p_atribuicao(self, p):
  		'''
- 		atribuicao : var ":=" expressao
+ 		atribuicao : var ATRIBUICAO expressao
  		'''
  		if len(p):
- 			p[0] = Tree('atribuicao', [p[1], p[3]])
- 			
-
+ 			p[0] = Tree('atribuicao', [p[1], p[3]]) 			
+	 		
  	def p_leia(self, p):
  		'''
  		leia : LEIA ABREPAR IDENTIFICADOR FECHAPAR
  		'''
  		if len(p):
  			p[0] = Tree('leia', [], p[3])
- 			
+
  	def p_escreva(self, p):
  		'''
  		escreva : ESCREVA ABREPAR expressao FECHAPAR
@@ -210,7 +229,7 @@ class Sintatica:
  			
  	def p_retorna(self, p):
  		'''
- 		escreva : RETORNA ABREPAR expressao FECHAPAR
+ 		retorna : RETORNA ABREPAR expressao FECHAPAR
  		'''
 		p[0] = Tree('retorna', [p[3]])
  			
@@ -220,17 +239,18 @@ class Sintatica:
  					| atribuicao
  		'''
 		p[0] = Tree('expressao', [p[1]])
+
  			
  	def p_expressao_simples(self, p):
  		'''
  		expressao_simples : expressao_aditiva
- 							| expressao simples operador_relacional expressao_aditiva
+ 							| expressao_simples operador_relacional expressao_aditiva
  		'''
  		if len(p) == 2:
 			p[0] = Tree('expressao_simples', [p[1]])
-		elif len(p) = 4:
+		elif len(p) == 4:
 			p[0] = Tree('expressao_simples', [p[1], p[2], p[3]])
-
+	 		
 	def p_expressao_aditiva(self, p):
  		'''
  		expressao_aditiva : expressao_multiplicativa
@@ -238,7 +258,7 @@ class Sintatica:
  		'''
  		if len(p) == 2:
 			p[0] = Tree('expressao_aditiva', [p[1]])
-		elif len(p) = 4:
+		elif len(p) == 4:
 			p[0] = Tree('expressao_aditiva', [p[1], p[2], p[3]])
 
 
@@ -250,7 +270,7 @@ class Sintatica:
  		'''
  		if len(p) == 2:
 			p[0] = Tree('expressao_multiplicativa', [p[1]])
-		elif len(p) = 4:
+		elif len(p) == 4:
 			p[0] = Tree('expressao_multiplicativa', [p[1], p[2], p[3]])
 
 	
@@ -274,13 +294,14 @@ class Sintatica:
 							| IGUALDADE
 							| MENORIGUAL
 							| MAIORIGUAL
+							| NEGACAO
 		'''
 
 		p[0] = Tree('operador_relacional', [ ])
 
 	def p_operador_soma(self, p):
 		'''
-		soma : SOMA
+		operador_soma : SOMA
 				| SUBTRACAO
 		'''
 		p[0] = Tree('operador_soma', [ ])
@@ -290,7 +311,6 @@ class Sintatica:
 		operador_multiplicacao : MULTIPLICACAO
 								| DIVISAO
 		'''
-
 		p[0] = Tree('operador_multiplicacao', [ ])
 
 	def p_fator(self, p):
@@ -307,23 +327,21 @@ class Sintatica:
 
 	def p_numero(self, p):
 		'''
-		numero : NUM_INTEIRO
-				| NUM_PONTO_FLUTUANTE
-				| NUM_NOTACAO_CIENTIFICA
+		numero : INTEIRO
+				| FLUTUANTE
 
 		'''
-
 		p[0] = Tree('numero', [ ])
 
 	def p_chamada_funcao(self, p):
 		'''
 		chamada_funcao : IDENTIFICADOR ABREPAR lista_argumentos FECHAPAR
 		'''
-		p[0] = Tree('chamada_funcao', [p[2]], p[1])
+		p[0] = Tree('chamada_funcao', [p[3]], p[1])
 
 	def p_lista_argumentos(self, p):
 		'''
-		lista_argumentos : lista_argumentos "," expressao
+		lista_argumentos : lista_argumentos VIRGULA expressao
 						| expressao
 						| vazio
 		'''
@@ -332,3 +350,34 @@ class Sintatica:
 		else:
 			p[0] = Tree('lista_argumentos',[p[1]])
 
+ 	def p_vazio(self, p):
+		'''
+        vazio :
+		'''
+	def p_error(self, p):
+		if p:
+			print("Erro sintático: '%s', linha %d" % (p.value, p.lineno))
+			exit(1)
+		else:
+			yacc.restart()
+			print('Erro sintático: definições incompletas!')
+			exit(1)
+
+	def printar(self):
+		self.g.view()
+
+def mostra_tree(node,w,i):
+    if node != None:
+        value1 = node.type + str(i)
+        i = i + 1
+        for son in node.child:
+			w.edge(value1,str(son) + str(i))
+			mostra_tree(son,w,i)
+
+if __name__ == '__main__':
+	from sys import argv, exit
+	f = open(argv[1])
+	arvore = Parser(f.read())
+	w = Digraph('G', filename='Saidas/Saida.gv')
+	mostra_tree(arvore.ast,w,i = 0)
+	w.view()

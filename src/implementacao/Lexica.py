@@ -5,10 +5,10 @@ import sys
 
 class Lexica:
 
-    def __init__(self):
-        self.lexer = lex.lex(debug=False, module=self, optimize=False)
+	def __init__(self):
+		self.lexer = lex.lex(debug=False, module=self, optimize=False)
 
-	reserved = { # Hashmap de palavras reservados
+	reserved = {
 		'se' : 'SE',
 		'então' : 'ENTAO',
 		'senão' : 'SENAO',
@@ -20,7 +20,6 @@ class Lexica:
 		'até' : 'ATE',
 		'escreva' : 'ESCREVA',
 		'inteiro' : 'INTEIRO',
-		'principal' : 'PRINCIPAL'
 	}
 
 	tokens = [ # Vetor de tokens
@@ -44,8 +43,8 @@ class Lexica:
 		'OULOGICO',
 		'NEGACAO',
 		'IDENTIFICADOR',
-		'COMENTARIO',
-	] + reserved.values()
+		'COMMENT',
+	] + list(reserved.values())
 
 
 	t_SOMA = r'\+'								# +
@@ -69,37 +68,36 @@ class Lexica:
 	t_NEGACAO = r'\!'							# !
 
 
-	def t_FLUTUANTE(t): # Números flutuantes (0.2, 1.7, 9.1)
+	def t_FLUTUANTE(self, t): # Números flutuantes (0.2, 1.7, 9.1)
 		r'\d+\.\d+'
 		t.value = float(t.value)
 		return t
 
-	def t_INTEIRO(t): # Números inteiros (1, 54, 12)
+	def t_INTEIRO(self, t): # Números inteiros (1, 54, 12)
 		r'\d+'
 		t.value = int(t.value)
 		return t
 
-	def t_COMENTARIO(t): # Comentários (reconhecimento de \n)
+	def t_COMMENT(self, t): # Comentários (reconhecimento de \n)
 		r'\{[^}]*[^{]*\}'
 		for x in xrange(1,len(t.value)):
 			if t.value[x] == "\n":
 				t.lexer.lineno+= 1
-		return t;
 
-	def t_IDENTIFICADOR(t): # Identificadores e palavras reservadas
-	    r'[a-zA-Z][a-zA-Z_0-9à-ú]*'
-	    t.type = reserved.get(t.value,'IDENTIFICADOR') # Verifica na tabela hash se a PR está presente
-	    return t
+	def t_IDENTIFICADOR(self, t): # Identificadores e palavras reservadas
+		r'[a-zA-Z][a-zA-Z_0-9à-ú]*'
+		t.type = self.reserved.get(t.value,'IDENTIFICADOR')
+		return t
 
-	def t_newline(t): # Contagem de linhas do código
-	    r'\n+'
-	    t.lexer.lineno += len(t.value)
+	def t_newline(self, t): # Contagem de linhas do código
+		r'\n+'
+		t.lexer.lineno += len(t.value)
 
 	t_ignore = '\t '
 
-	def t_error(t): # Tratamento de caracteres não reconhecidos
-	    print("Caractere não reconhecido '%s'" % t.value[0])
-	    t.lexer.skip(1)
+	def t_error(self, t): # Tratamento de caracteres não reconhecidos
+		print("Caractere não reconhecido '%s'" % t.value[0])
+		t.lexer.skip(1)
 
 
 	def main():
@@ -119,7 +117,7 @@ class Lexica:
 
 		while True:
 			tok = lexer.token()
-		    
+
 			if not tok: 
 				break# No more input
 
@@ -135,5 +133,3 @@ if __name__ == '__main__':
     lexica = Lexica()
     
 
-	# Comentário > alerta para fechamento
-	# Principal não precisa ser caractere reservado
