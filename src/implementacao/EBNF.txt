@@ -1,0 +1,106 @@
+programa : lista_declaracoes
+	 	
+lista_declaracoes : lista_declaracoes declaracao
+	 						| declaracao		
+	 
+declaracao : declaracao_variaveis
+			| inicializacao_variaveis
+			| declaracao_funcao
+
+declaracao_variaveis : tipo DOISPONTOS lista_variaveis 	
+
+inicializacao_variaveis : atribuicao
+	 	
+lista_variaveis : lista_variaveis VIRGULA var
+ 	 	 		| var
+	 	
+var : IDENTIFICADOR
+	| IDENTIFICADOR indice
+
+indice : indice ABRECOL expressao FECHACOL
+		| ABRECOL expressao FECHACOL
+	 	
+tipo : INTEIRO
+
+tipo : FLUTUANTE
+
+declaracao_funcao : tipo cabecalho
+				| cabecalho
+	
+	cabecalho : IDENTIFICADOR ABREPAR lista_parametros FECHAPAR corpo FIM
+	
+	lista_parametros : lista_parametros VIRGULA lista_parametros
+						| parametro
+						| vazio
+	
+	parametro : tipo DOISPONTOS IDENTIFICADOR
+	
+	parametro : parametro ABRECOL FECHACOL
+	
+	corpo : corpo acao
+			| vazio
+	
+	acao : expressao
+			| declaracao_variaveis
+			| se
+			| repita
+			| leia
+			| escreva
+			| retorna
+			| error 		
+	
+se : SE expressao ENTAO corpo FIM
+		| SE expressao ENTAO corpo SENAO corpo FIM
+	
+	repita : REPITA corpo ATE expressao
+	
+atribuicao : var ATRIBUICAO expressao
+	
+	leia : LEIA ABREPAR IDENTIFICADOR FECHAPAR
+	
+	escreva : ESCREVA ABREPAR expressao FECHAPAR
+	
+	retorna : RETORNA ABREPAR expressao FECHAPAR
+	
+expressao : expressao_simples
+				| atribuicao
+	
+expressao_simples : expressao_aditiva
+						| expressao_simples operador_relacional expressao_aditiva
+	
+	expressao_aditiva : expressao_multiplicativa
+						| expressao_aditiva operador_multiplicacao expressao_unaria
+	
+expressao_multiplicativa : expressao_unaria
+				| expressao_multiplicativa operador_multiplicacao expressao_unaria 		
+	
+expressao_unaria : fator
+				| operador_soma fator				
+			
+operador_relacional : MENOR
+					| MAIOR
+					| IGUALDADE
+					| MENORIGUAL
+					| MAIORIGUAL
+					| NEGACAO
+			
+operador_soma : SOMA
+		| SUBTRACAO
+
+operador_multiplicacao : MULTIPLICACAO
+						| DIVISAO
+
+fator : ABRECOL  expressao FECHACOL
+		| var
+		| chamada_funcao
+		| numero
+
+numero : INTEIRO
+		| FLUTUANTE		
+
+chamada_funcao : IDENTIFICADOR ABREPAR lista_argumentos FECHAPAR
+
+lista_argumentos : lista_argumentos VIRGULA expressao
+		| expressao
+		| vazio
+
