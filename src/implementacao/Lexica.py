@@ -97,7 +97,13 @@ class Lexica:
 
 	def t_error(self, t): # Tratamento de caracteres não reconhecidos
 		print("Caractere não reconhecido '%s'" % t.value[0])
-		t.lexer.skip(1)
+		if (t.value[0] == '{'):
+			print "ERROR: Comentário sem fechamento. } esperado."
+		if  (t.value[0] == '}'):
+			print "ERROR: Comentário sem abertura. { esperado."
+		return None
+		#t.lexer.skip(1)
+		
 
 
 	def main():
