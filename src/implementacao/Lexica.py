@@ -3,6 +3,7 @@
 import ply.lex as lex
 import sys
 
+
 class Lexica:
 
 	def __init__(self):
@@ -67,24 +68,23 @@ class Lexica:
 	t_OULOGICO = r'\|\|'						# ||
 	t_NEGACAO = r'\!'							# !
 
-
 	def t_FLUTUANTE(self, t): # Números flutuantes (0.2, 1.7, 9.1)
 		r'\d+\.\d+'
 		t.value = float(t.value)
 		return t
 
-	def t_INTEIRO(self, t): # Números inteiros (1, 54, 12)
+	def t_INTEIRO(self, t):  #  Números inteiros (1, 54, 12)
 		r'\d+'
 		t.value = int(t.value)
 		return t
 
-	def t_COMMENT(self, t): # Comentários (reconhecimento de \n)
+	def t_COMMENT(self, t):  # Comentários (reconhecimento de \n)
 		r'\{[^}]*[^{]*\}'
 		for x in xrange(1,len(t.value)):
 			if t.value[x] == "\n":
 				t.lexer.lineno+= 1
 
-	def t_IDENTIFICADOR(self, t): # Identificadores e palavras reservadas
+	def t_IDENTIFICADOR(self, t):
 		r'[a-zA-Z][a-zA-Z_0-9à-ú]*'
 		t.type = self.reserved.get(t.value,'IDENTIFICADOR')
 		return t
@@ -102,15 +102,13 @@ class Lexica:
 		if  (t.value[0] == '}'):
 			print "ERROR: Comentário sem abertura. { esperado."
 		return None
-		#t.lexer.skip(1)
-		
-
+		# t.lexer.skip(1)		
 
 	def main():
 		lexer = lex.lex()
 
 		try:
-			arquivoEntrada = open(sys.argv[1],'r') # Arquivo passado como argumento na execução
+			arquivoEntrada = open(sys.argv[1] , 'r') # Arquivo passado como argumento na execução
 		except IOError: # Tratamento de erro
 			print "Arquivo não existe. Cheque se o caminho digitado é válido"
 			return 0
@@ -129,13 +127,12 @@ class Lexica:
 
 			token = "<"+str(tok.type)+",'"+str(tok.value)+"'> : " + str(tok.lineno) # Mostra o token
 																					# no formato <token, lexema> : linha
-		    
+			
 			print token
 			arquivo.write(token + "\n") # Escrita do token no formato  <token, lexema> : linha
 			
 		arquivo.close() # Fechamento do arquivo
 
 if __name__ == '__main__':
-    lexica = Lexica()
-    
+	lexica = Lexica()
 
