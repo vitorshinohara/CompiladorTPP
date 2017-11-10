@@ -149,7 +149,6 @@ class Parser:
 		'''
 		lista_parametros : lista_parametros VIRGULA lista_parametros
 							| parametro
-							| vazio
 		'''
 
 		if len(p) == 4:
@@ -157,6 +156,11 @@ class Parser:
 		elif len(p) == 2:
 			p[0] = Tree('lista_parametros', [p[1]])
 
+	def p_lista_parametros2(self, p):
+		'''
+		lista_parametros :  vazio
+		'''
+		# None
 
 
 	def p_parametro1(self, p):
@@ -182,13 +186,19 @@ class Parser:
 	def p_corpo(self, p):
 		'''
 		corpo : corpo acao
-				| vazio
+
 		'''
 
 		if len(p) == 3:
 			p[0] = Tree('corpo', [p[1], p[2]])
 		elif len(p) == 2:
 			p[0] = Tree('corpo', [p[1]])
+
+
+	def p_corpo2(self, p):
+		'''
+		corpo : vazio
+		'''
 
 	def p_acao(self, p):
 		'''
@@ -227,7 +237,7 @@ class Parser:
 		atribuicao : var ATRIBUICAO expressao
 		'''
 		if len(p):
-			p[0] = Tree('atribuicao', [p[1], p[3]])
+			p[0] = Tree('atribuicao', [p[1], p[3]], p[2])
 
 	
 	def p_leia(self, p):
@@ -366,12 +376,16 @@ class Parser:
 		'''
 		lista_argumentos : lista_argumentos VIRGULA expressao
 						| expressao
-						| vazio
 		'''
 		if len(p) == 4:
 			p[0] = Tree('lista_argumentos', [p[1], p[3]])
 		else:
 			p[0] = Tree('lista_argumentos', [p[1]])
+
+	def p_lista_argumentos2(self, p):
+		'''
+		lista_argumentos : vazio
+		'''
 
 	def p_vazio(self, p):
 		'''
