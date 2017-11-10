@@ -170,7 +170,7 @@ class Parser:
 		'''
 		parametro : error DOISPONTOS IDENTIFICADOR
 		'''
-		print "Erro de parâmetro \n"
+		raise SyntaxError("Erro de parâmetro \n")
 
 	def p_parametro2(self, p):
 		'''
@@ -320,19 +320,19 @@ class Parser:
 							| ELOGICO
 		'''
 
-		p[0] = Tree('operador_relacional', [])
+		p[0] = Tree('operador_relacional', [], str(p[1]))
 
 	def p_operador_soma(self, p):
 		'''
 		operador_soma : SOMA
 						| SUBTRACAO
 		'''
-		p[0] = Tree('operador_soma', [])
+		p[0] = Tree('operador_soma', [], str(p[1]))
 
 	def p_operador_multiplicacao(self, p):
 		'''
 		operador_multiplicacao : MULTIPLICACAO
-											| DIVISAO
+								| DIVISAO
 		'''
 		p[0] = Tree('operador_multiplicacao', [])
 
@@ -354,7 +354,7 @@ class Parser:
 				| FLUTUANTE
 
 		'''
-		p[0] = Tree('numero', [])
+		p[0] = Tree('numero', [], str(p[1]))
 
 	def p_chamada_funcao(self, p):
 		'''
@@ -389,25 +389,25 @@ class Parser:
 							| error
 
 		'''
-		print "Erro de declaração \n"
+		raise SyntaxError("Erro de declaração \n")
 
 	def p_declaracao_error(self, p):
 		'''
 		declaracao : error
 		'''
-		print "Erro de declaração \n"
+		raise SyntaxError("Erro de declaração \n")
 
 	def p_declaracao_variaveis_error(self, p):
 		'''
 		declaracao_variaveis : error DOISPONTOS error 	
 		'''
-		print "Erro na declaração de variaveis \n"
+		raise SyntaxError("Erro na declaração de variaveis \n")
 
 	def p_inicializacao_variaveis_error(self, p):
 		'''
 		inicializacao_variaveis : error
 		'''
-		print "Erro na inicialização de variaveis \n"
+		raise SyntaxError("Erro na inicialização de variaveis \n")
 
 	def p_lista_variaveis_error(self, p):
 		'''
@@ -415,46 +415,46 @@ class Parser:
 						| error
 		'''
 
-		print "Erro de variável \n"
+		raise SyntaxError("Erro de variável \n")
 
 	def p_var_error(self, p):
 		'''
 		var : IDENTIFICADOR error
 		'''
-		print "Erro de variavel \n"
+		raise SyntaxError("Erro de variavel \n")
 
 	def p_indice_error(self, p):
 		'''
 		indice : indice ABRECOL error FECHACOL
 				| ABRECOL error FECHACOL
 		'''
-		print "Erro sintático de indexação \n"
+		raise SyntaxError("Erro sintático de indexação \n")
 
 	def p_tipo_error(self, p):
 		'''
 		tipo : error
 		'''
-		print "Erro de tipo de variável \n"
+		raise SyntaxError("Erro de tipo de variável \n")
 
 	def p_declaracao_funcao_error(self, p):
 		'''
 		declaracao_funcao : error error
 							| error
 		'''
-		print "Erro na declaração de função \n"
+		raise SyntaxError("Erro na declaração de função \n")
 
 	def p_cabecalho_error(self, p):
 		'''
 		cabecalho : IDENTIFICADOR ABREPAR error FECHAPAR error FIM
 		'''
-		print "Erro no cabeçalho \n"
+		raise SyntaxError("Erro no cabeçalho \n")
 
 	def p_lista_parametros_error(self, p):
 		'''
 		lista_parametros : error VIRGULA error
 		'''
 
-		print "Erro de parâmetro \n"
+		raise SyntaxError("Erro de parâmetro \n")
 
 	def p_corpo_error(self, p):
 		'''
@@ -462,80 +462,81 @@ class Parser:
 				| error
 		'''
 
-		print "Erro de corpo de função \n"
+		raise SyntaxError("Erro de corpo de função \n")
 
 	def p_acao_error(self, p):
 		'''
 		acao : error
 
 		'''
-		print "Erro na ação \n"
+		raise SyntaxError("Erro na ação \n")
 
 	def p_se_error(self, p):
 		'''
 		se : SE error ENTAO error FIM
 				| SE error ENTAO error SENAO error FIM
 		'''
-		print "Erro na expressão se \n"
+		raise SyntaxError("Erro na expressão se \n")
 
 	def p_repita_error(self, p):
 		'''
 		repita : REPITA error ATE error
 		'''
-		print "Erro na expressão repita \n"
+		raise SyntaxError("Erro na expressão repita \n")
 
 	def p_atribuicao_error(self, p):
 		'''
 		atribuicao : error ATRIBUICAO error
 		'''
-		print "Erro de atribuição \n"
+		raise SyntaxError("Erro de atribuição \n")
 
 	def p_leia_error(self, p):
 		'''
 		leia : error error error error
 		'''
-		print "Erro na expressão LEIA \n"
+		raise SyntaxError("Erro na expressão LEIA \n")
 
 	def p_escreva_error(self, p):
 		'''
 		escreva : ESCREVA ABREPAR error FECHAPAR
 		'''
-		print "Erro na expressão ESCREVA \n"
+		raise SyntaxError("Erro na expressão ESCREVA \n")
 
 	def p_retorna_error(self, p):
 		'''
 		retorna : RETORNA ABREPAR error FECHAPAR
 		'''
-		print "Erro na expressão RETORNA \n"
+		raise SyntaxError("Erro na expressão RETORNA \n")
 
 	def p_expressao_error(self, p):
 		'''
 		expressao : error
 		'''
-		print "Erro de expressão \n"
+		raise SyntaxError("Erro de expressão \n")
 
 	def p_expressao_simples_error(self, p):
 		'''
 		expressao_simples : error
 						| error error error				
 		'''
-		print "Erro de expressão simples \n"
+		raise SyntaxError("Erro de expressão simples \n")
 
 	def p_expressao_aditiva_error(self, p):
 		'''
 		expressao_aditiva : error
 						| error error error
 		'''
-		print "Erro de expressão aditiva \n"
+		raise SyntaxError("Erro de expressão aditiva \n")
 
 
 
 	def p_error(self, p):
 		if p:
-			print("Erro sintático: '%s', linha %d" % (p.value, p.lineno))
+			raise SyntaxError(" '%s', linha %d" % (p.value, p.lineno))
 			# exit(1)
 		else:
-			print('Erro sintático: definições incompletas!')
+			raise SyntaxError(" definições incompletas!")
+			#print('Erro sintático: definições incompletas!')
 			exit(1)
 
 	##############################################################################
@@ -546,14 +547,23 @@ class Parser:
 		self.g.view()
 
 
-def mostra_tree(node, w, i):
-	if node != None:
-		# print node.value
-		value1 = node.type + str(i)
-		i = i + 1
-		for son in node.child:
-			w.edge(value1, str(son) + str(i))
-			mostra_tree(son, w, i)
+
+class Imprimir():
+	def __init__(self):
+		self.j = 1
+		
+	def mostra_tree(self,node,strson, father, w, i):
+		if node != None :
+			i = i + 1
+			father = str(node) + " " + str(i-1)+ " " + str(self.j-1)
+			for son in node.child:
+				strson = str(son) + " " + str(i) + " " + str(self.j)
+				w.edge(father, strson)
+				self.j = self.j + 1
+				self.mostra_tree(son, strson, father, w, i)
+
+
+
 
 if __name__ == '__main__':
 	from sys import argv, exit
@@ -561,7 +571,14 @@ if __name__ == '__main__':
 	try:
 		arvore = Parser(f.read())
 		w = Digraph('G', filename='Saidas/Saida.gv')
-		mostra_tree(arvore.ast, w, i=0)
+		tree = Imprimir().mostra_tree(arvore.ast,'','', w, i=0)
+		
 		w.view()
-	except Exception, e:
-		print "Erro sintático"
+
+	except SyntaxError, e:
+		print "SyntaxError: " + str(e)
+		#raise SyntaxError(e)
+	
+	except IOError:
+		print "Erro: Arquivo não encontrado. Verifique se o nome ou diretório está correto."
+		#raise IOError("Erro: Arquivo não encontrado. Verifique se o nome ou diretório está correto.") 
