@@ -296,7 +296,7 @@ class Parser:
 	def p_expressao_multiplicativa(self, p):
 		'''
 		expressao_multiplicativa : expressao_unaria
-								| expressao_multiplicativa operador_multiplicacao expressao_unaria
+								| expressao_aditiva operador_soma expressao_multiplicativa
 
 		'''
 		if len(p) == 2:
