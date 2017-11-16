@@ -12,9 +12,9 @@ from Sintatica import Parser
 # [DONE] Obter argumentos de uma função
 # [DONE] Validar argumentos de uma função
 # [DONE] Verificar chamadas de funções inexistentes
-# [TO DOS] Verificar soma de estruturas diferentes (Vetor + variável)
-# [TO DO] Recursão da função principal
-# [TO DO] Verificar índices da função
+# [DONE] Recursão da função principal
+# [DONE] Verificar índices da função
+# [TO DO] Verificar soma de estruturas diferentes (Vetor + variável)
 
 
 class Function():
@@ -109,17 +109,22 @@ class Semantica():
 			if node.type == "cabecalho": # Caso o nó for um cabecalho, armazenamos o escopo
 				escopo = node.value
 			elif node.type == "se": # Caso o nó for um 'se'
-				self.condicional(node) # Verifica condicional
+				self.condicional(node, escopo) # Verifica condicional
 			elif node.type == "atribuicao": # Caso o nó for uma atribuição
 				self.atribuicao(node, escopo) # Obtem tipos das variáveis na expressão e verifica
 			elif node.type == "retorna": 
 				self.retorna(escopo, node) # Verifica o retorno de uma função
 			elif node.type == "chamada_funcao":
 				self.chamada_funcao(node, escopo)
+
+			elif node.type == "var":
+				if len(node.child) > 0:
+					self.verificarIndiceVetor(node, escopo)
+
 			for son in node.child:
 				self.verificarEstruturas(escopo, son)
 
-	def condicional(self, node): # Verifica operadores de uma condicional
+	def condicional(self, node, escopo): # Verifica operadores de uma condicional
 		node = node.child[0]
 		var1 = None
 		var2 = None
@@ -129,11 +134,11 @@ class Semantica():
 			var2 = self.descerTree(node.child[2])
 
 		if var1.type == 'var':
-			tipo1 = self.getTypeVar(var1)
+			tipo1 = self.searchSymbolsTable(var1.value, escopo)
 		else:
 			tipo1 = self.getTypeNum(float(var1.value))
 		if var2.type == 'var':
-			tipo2 = self.getTypeVar(var2)
+			tipo2 = self.searchSymbolsTable(var2.value, escopo)
 		else:
 			tipo2 = self.getTypeNum(float(var2.value))
 		if tipo1 != tipo2:
@@ -147,7 +152,7 @@ class Semantica():
 		tipos = []
 
 		leftVar = node.child[0]
-		leftType = self.getTypeVar(leftVar)
+		leftType = self.searchSymbolsTable(leftVar.value, escopo)
 		tipos.append(leftType)
 
 		right = self.descerTree(node.child[1])
@@ -177,10 +182,15 @@ class Semantica():
 			tipo_expr = self.expressao_unaria(right, escopo)
 			tipos.append(tipo_expr)
 	
+		for i in range(0, len(tipos)):
+			if tipos[0] != tipos[i]:
+				if tipos[0] == False or tipos[0] is None:
+					aux = tipos[i]
+				else:
+					aux = tipos[0]
 
-		for i in range(0, len(tipos) - 1):
-			if tipos[i] != tipos[i + 1]:
-				print "ERRO: Variáveis de tipos inconpatívels. Esperado tipo " + str(tipos[i])
+				print "ERRO: Variáveis de tipos incompatíveis. Esperado tipo " + str(aux)
+
 				break
 	
 	# Inicio função expressao_simples
@@ -202,7 +212,6 @@ class Semantica():
 			tipo2 = self.expressao_aditiva(node.child[2], escopo)
 			if tipo1 != tipo2:
 				return False # Caso os tipos forem diferentes, retorna False
-
 			else:
 				return tipo1 # Retorna o tipo da variável em uma expressao simples
 
@@ -289,7 +298,7 @@ class Semantica():
 	# End função verificarUtilizacao
 
 	def verificarRetornos(self):
-		for function in self.functions:
+		for function in self.funcs:
 			if function.retorno == 0 and function.tipo != "void":
 				print "ERRO: Função " + function.nome + " sem retorno. Esperado retornar " + function.tipo
 
@@ -298,13 +307,16 @@ class Semantica():
 			if str(x.valor) == str(var) and ( str(x.escopo) == str(escopo) or str(x.escopo) == "global" ):
 				x.utilizada = 1
 				return str(x.tipo)
+		
+		print "ERRO: Variável " + var + " sendo utilizada sem ser declarada."
+		return False
 	
 	def retorna(self, escopo, node):
 		y = self.descerTree(node) # Desce até uma bifurcação ou var / numero
 		# Armazena o tipo da variavel da folha para a variavel tipo
 		tipo = ''
 		if y.type == "var":
-			tipo = self.getTypeVar(y)
+			tipo = self.searchSymbolsTable(y.value, escopo)
 		elif y.type == "numero":
 			tipo = self.getTypeNum(float(y.value))
 		elif y.type == "expressao_simples":
@@ -318,9 +330,9 @@ class Semantica():
 
 		for function in self.funcs:
 			if function.tipo != tipo and function.nome == escopo: # Se o tipo da função é diferente do tipo retornado
-				print "Erro no retorno da função " + escopo +" tipo " + tipo + " esperado"
+				print "ERRO: Retorno da função " + escopo + " incorreto . Tipo " + function.tipo + " esperado"
 				break
-			elif function.tipo == tipo and function.nome == escopo:
+			if function.tipo == tipo and function.nome == escopo:
 				function.retorno = 1
 				break
 
@@ -342,7 +354,7 @@ class Semantica():
 					else:
 						for j in range(0,len(args)):
 							if args[j] != i.parametros[j]:
-								print "ERRO: Tipos inconpatívels. Argumento " + str(j+1) + " deve ser um " + str(i.parametros[j]) + ". Função " + str(i.nome)
+								print "ERRO: Tipos incompatíveis. Argumento " + str(j+1) + " deve ser um " + str(i.parametros[j]) + ". Função " + str(i.nome)
 								return False
 						return True
 
@@ -401,10 +413,34 @@ class Semantica():
 			return 'flutuante'
 
 	def descerTree(self, node):
-		while node is not None and len(node.child) == 1:
+		while node is not None and len(node.child) == 1 and node.type != "var":
 			node = node.child[0]
 		return node
 	
+	
+	def verificarIndiceVetor(self, node, escopo):
+		y = self.descerTree(node.child[0])
+		
+		tipo = ""
+
+		if y.type == "var":
+			tipo = self.searchSymbolsTable(y.value, escopo)
+		elif y.type == "numero":
+			tipo = self.getTypeNum(float(y.value))
+		elif y.type == "expressao_simples":
+			tipo = self.expressao_simples(y, escopo)
+		elif y.type == "expressao_aditiva":
+			tipo = self.expressao_aditiva(y, escopo)
+		elif y.type == "expressao_multiplicativa":
+			tipo = self.expressao_multiplicativa(y, escopo)
+		elif y.type == "expressao_unaria":
+			tipo = self.expressao_unaria(y, escopo)
+
+		if tipo == "flutuante":
+			print "ERRO: Índice do vetor "+ node.value +" deve ser do tipo inteiro."
+
+
+
 	### End Helpers ###
 
 
