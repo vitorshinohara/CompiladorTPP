@@ -14,7 +14,6 @@ from Sintatica import Parser
 # [DONE] Verificar chamadas de funções inexistentes
 # [DONE] Recursão da função principal
 # [DONE] Verificar índices da função
-# [TO DO] Verificar soma de estruturas diferentes (Vetor + variável)
 
 
 class Function():
@@ -44,7 +43,6 @@ class Semantica():
 		self.funcs = []
 		parser = Parser(code)
 		self.criarSimb("global", parser.ast)
-		self.genFunctionTable(parser.ast)
 		self.verificarEstruturas("global", parser.ast) 				# Gera a tabela de símbolos
 		self.verificarPrincipal()								# Verifica se a função Principal foi declarada
 		self.verificarUtilizacao()								# Verifica se as variáveis foram inicializadas e não utilizadas
@@ -60,47 +58,38 @@ class Semantica():
 			elif node.type == "declaracao_variaveis":
 				self.genSymbolsTable_add(escopo, node) # Adiciona na tabela de símbolos
 
+			elif node.type == "parametro":
+				self.parametro(escopo,node)
+
 			for son in node.child:
 				self.criarSimb(escopo, son)
+
+	def parametro(self, escopo, node):
+		if len(node.child) > 0:
+			no = Node(escopo, node.child[0], node.value, "var")
+			self.symbols.append(no)
 
 	def genSymbolsTable_add(self, escopo, node): 				# Gera a tabela de símbolos
 		estrutura = "var"
 		tipo = node.child[0].type 								# Tipo da variável <inteiro/flutuante>
-		var = node.child[1]
-		value = var.child[0].value 								# Nome da variável <i/j/tam>
-
-		if var.child[0].child != []:
-			if node.child[1].child[0].child[0].type == "indice":
-				estrutura = "array"
-		no = Node(escopo, tipo, value, estrutura) 				# Cria o nó
-		self.symbols.append(no)									# Adiciona o nó na tebela de símbolos
+		lv = node.child[1]
+		vars = self.lista_variaveis(lv, escopo, tipo) 								# Nome da variável <i/j/tam>
+		
+	def lista_variaveis(self, node, escopo, tipo):
+		estrutura = "var"
+		if len(node.child) == 2:
+			if len(node.child[1].child) > 0:
+				if node.child[1].child[0].type == "indice":
+					estrutura = "array"				
+			no = Node(escopo, tipo, node.child[1].value, estrutura)
+			self.symbols.append(no)
+			self.lista_variaveis(node.child[0], escopo, tipo)
+		else:
+			no = Node(escopo, tipo, node.child[0].value, estrutura)
+			self.symbols.append(no)
+			return
 
 ## Fim funções Geração da tabela de símbolos ##
-
-
-## Início função Geração da tabela de funções ##
-
-	def genFunctionTable(self, node): # Monta a tabela de funções
-		if node is not None:
-			if node.type == "declaracao_funcao":
-				args = []
-				
-				if len(node.child[0].child) > 0:
-					if node.child[0].child[0] is not None:	
-						if node.child[0].child[0].type == "lista_parametros": # Procura se a função tem uma lista de parâmetros
-							args = self.lista_parametros(node.child[0].child[0], args) # Obtem a lista de tipos de parâmetro <inteiro/float>
-
-				if len(node.child) == 2: 						# Caso da funções com return <inteiro nomedaFunc()>
-					func = Function(node.child[0].type, node.child[1].value, args)
-				else: 											# Caso de funções void <nomedaFunc()>
-					func = Function("void", node.child[0].value, args)
-				
-				self.funcs.append(func)							# Adiciona o obj func na lista de funções
-
-			for son in node.child:
-				self.genFunctionTable(son)
-
-## Fim função Geração da tabela de funções ##
 
 ## Início funções de verificação da estrutura ##
 
@@ -116,10 +105,11 @@ class Semantica():
 				self.retorna(escopo, node) # Verifica o retorno de uma função
 			elif node.type == "chamada_funcao":
 				self.chamada_funcao(node, escopo)
-
 			elif node.type == "var":
 				if len(node.child) > 0:
 					self.verificarIndiceVetor(node, escopo)
+			elif node.type == "declaracao_funcao":
+				self.declaracao_funcao(node)
 
 			for son in node.child:
 				self.verificarEstruturas(escopo, son)
@@ -136,16 +126,40 @@ class Semantica():
 		if var1.type == 'var':
 			tipo1 = self.searchSymbolsTable(var1.value, escopo)
 		else:
-			tipo1 = self.getTypeNum(float(var1.value))
+			tipo1 = self.getTypeNum(var1.value)
 		if var2.type == 'var':
 			tipo2 = self.searchSymbolsTable(var2.value, escopo)
 		else:
-			tipo2 = self.getTypeNum(float(var2.value))
+			tipo2 = self.getTypeNum(var2.value)
 		if tipo1 != tipo2:
 			print "Erro: Expressão SE incorreta. Esperado dois tipos " + tipo1
 		if node.child[1].type != 'operador_relacional':
 			print "Erro: Expressão se esperando operador lógico"
 	# End função Se
+
+	def declaracao_funcao(self, node):
+		args = []
+
+		if len(node.child) > 1:
+			nome = node.child[1].value
+			tipo = node.child[0].type
+			args = self.cabecalho(node.child[1], args)
+
+		else:
+			nome = node.child[0].value
+			tipo = "void"
+			args = self.cabecalho(node.child[0], args)
+
+		funcao = Function(tipo, nome, args)
+		self.funcs.append(funcao)
+
+
+	def cabecalho(self, node, args):
+		if node is None:
+			return []
+		if node.child[0] is not None:
+			args = self.lista_parametros(node.child[0], args)
+			return args
 
 	# Inicio função corpo
 	def atribuicao(self, node, escopo):
@@ -156,6 +170,7 @@ class Semantica():
 		tipos.append(leftType)
 
 		right = self.descerTree(node.child[1])
+
 		if right.type == 'var':
 			tipo = self.searchSymbolsTable(right.value, escopo)			
 			if tipo is None:
@@ -163,7 +178,7 @@ class Semantica():
 			else: tipos.append(tipo)
 
 		elif right.type == 'numero':
-			tipo = self.getTypeNum(float(right.value))
+			tipo = self.getTypeNum(right.value)
 			tipos.append(tipo)
 	
 		if right.type == 'expressao_simples':
@@ -189,18 +204,18 @@ class Semantica():
 				else:
 					aux = tipos[0]
 
-				print "ERRO: Variáveis de tipos incompatíveis. Esperado tipo " + str(aux)
+				print "ERRO: Variáveis de tipos incompatíveis na atribuição à variável "+ node.child[0].value +". Esperado tipo " + str(aux)
 
 				break
 	
 	# Inicio função expressao_simples
-	def expressao_simples(self, node, escopo):
+	def expressao_simples(self, node, escopo):	
 		if len(node.child) == 1:
 			folha = self.descerTree(node)
 			if folha.type == 'var':
 				return self.searchSymbolsTable(folha.value, escopo)
 			elif folha.type == 'numero':
-				return self.getTypeNum(float(folha.value))
+				return self.getTypeNum(folha.value)
 			elif folha.type == 'expressao_aditiva':
 				return self.expressao_aditiva(folha, escopo)
 			elif folha.type == 'expressao_multiplicativa':
@@ -225,7 +240,7 @@ class Semantica():
 			if folha.type == 'var':
 				return self.searchSymbolsTable(folha.value, escopo)
 			elif folha.type == 'numero':
-				return self.getTypeNum(float(folha.value))
+				return self.getTypeNum(folha.value)
 			elif folha.type == 'expressao_multiplicativa':
 				return self.expressao_multiplicativa(folha, escopo)
 			elif folha.type == 'expressao_unaria':
@@ -247,7 +262,7 @@ class Semantica():
 			if folha.type == 'var':
 				return self.searchSymbolsTable(folha.value, escopo)
 			elif folha.type == 'numero':
-				return self.getTypeNum(float(folha.value))
+				return self.getTypeNum(folha.value)
 			elif folha.type == 'expressao_unaria':
 				return self.expressao_unaria(folha, escopo)
 
@@ -271,13 +286,13 @@ class Semantica():
 			if folha.type == 'var':
 					return self.searchSymbolsTable(folha.value, escopo)
 			elif folha.type == 'numero':
-					return self.getTypeNum(float(folha.value))
+					return self.getTypeNum(folha.value)
 		else:
 			tipo1 = self.descerTree(node.child[0])
 			if tipo1.type == 'var':
 				return self.searchSymbolsTable(tipo1.value, escopo)
 			elif tipo1.type == 'numero':
-				return self.getTypeNum(float(tipo1.value))
+				return self.getTypeNum(tipo1.value)
 	# End função expressao_unaria
 
 	# Inicio função verificarPrincipal
@@ -287,24 +302,40 @@ class Semantica():
 			if function.nome == "principal":
 				flag = 1
 		if flag == 0:
-			print "ERRO: Função principal não declarada"
+			print "ERRO: Função principal não declarada."
 	# End função verificarPrincipal
 
 	# Inicio função verificarUtilizacao
 	def verificarUtilizacao(self):
 		for simbolo in self.symbols:
-			if simbolo.utilizada == 0:
-				print "WARNING: Variável " + simbolo.valor + " declarada e não utilizada"
+			flag = 0
+			for simbolo2 in self.symbols:
+				if simbolo.valor == simbolo2.valor and simbolo.escopo == simbolo2.escopo:
+					flag = flag + 1
+					if flag > 1:
+						print "ERRO: Variável  " + simbolo.valor + " declarada duas vezes no escopo " + simbolo.escopo + "."
+						self.symbols.remove(simbolo)
+
+			if simbolo.utilizada == 0 and flag == 1:
+				print "WARNING: Variável " + simbolo.valor + " declarada e não utilizada no escopo " + simbolo.escopo + "."
+		
+
 	# End função verificarUtilizacao
 
 	def verificarRetornos(self):
 		for function in self.funcs:
 			if function.retorno == 0 and function.tipo != "void":
-				print "ERRO: Função " + function.nome + " sem retorno. Esperado retornar " + function.tipo
+				print "ERRO: Função " + function.nome + " sem retorno. Esperado retornar " + function.tipo + "."
 
 	def searchSymbolsTable(self, var, escopo):
+
 		for x in self.symbols:
-			if str(x.valor) == str(var) and ( str(x.escopo) == str(escopo) or str(x.escopo) == "global" ):
+			if str(x.valor) == str(var) and str(x.escopo) == str(escopo):
+				x.utilizada = 1
+				return str(x.tipo)
+
+		for x in self.symbols:
+			if str(x.valor) == str(var) and str(x.escopo) == "global":
 				x.utilizada = 1
 				return str(x.tipo)
 		
@@ -318,19 +349,19 @@ class Semantica():
 		if y.type == "var":
 			tipo = self.searchSymbolsTable(y.value, escopo)
 		elif y.type == "numero":
-			tipo = self.getTypeNum(float(y.value))
+			tipo = self.getTypeNum(y.value)
 		elif y.type == "expressao_simples":
-			tipo = self.expressao_simples
+			tipo = self.expressao_simples(y, escopo)
 		elif y.type == "expressao_aditiva":
-			tipo = self.expressao_aditiva
+			tipo = self.expressao_aditiva(y, escopo)
 		elif y.type == "expressao_multiplicativa":
-			tipo = self.expressao_multiplicativa
+			tipo = self.expressao_multiplicativa(y, escopo)
 		elif y.type == "expressao_unaria":
-			tipo = self.expressao_unaria
+			tipo = self.expressao_unaria(y, escopo)
 
 		for function in self.funcs:
 			if function.tipo != tipo and function.nome == escopo: # Se o tipo da função é diferente do tipo retornado
-				print "ERRO: Retorno da função " + escopo + " incorreto . Tipo " + function.tipo + " esperado"
+				print "ERRO: Retorno da função " + escopo + " incorreto. Tipo " + function.tipo + " esperado."
 				break
 			if function.tipo == tipo and function.nome == escopo:
 				function.retorno = 1
@@ -345,21 +376,26 @@ class Semantica():
 		for i in self.funcs: # Percorre a tabela de funções
 			if i.nome == node.value:  # Se a função estiver na tabela de funções
 				i.utilizada = 1 # Seta a função como utilizada
-				args = self.args_chamadaFunc(node.child[0], [], escopo)
+				
+				if node.child[0] is None:
+					return False
+
+				args = self.lista_argumentos(node.child[0], escopo, [])
+
 
 				if args is not None:
 					if len(args) != len(i.parametros) :
-						print "ERRO: " + str( len(i.parametros) ) + " esperados para a função " + i.nome + ". " + str(len(args)) + " passados"
+						print "ERRO: " + str( len(i.parametros) ) + " parâmetro(s) esperado(s) para a função " + i.nome + ". " + str(len(args)) + " passados."
 						return False
 					else:
 						for j in range(0,len(args)):
 							if args[j] != i.parametros[j]:
-								print "ERRO: Tipos incompatíveis. Argumento " + str(j+1) + " deve ser um " + str(i.parametros[j]) + ". Função " + str(i.nome)
+								print "ERRO: Tipos incompatíveis. Argumento " + str(j+1) + " deve ser um " + str(i.parametros[j]) + ". Função " + str(i.nome) + "."
 								return False
 						return True
 
 
-		print "ERRO: Função " + node.value + " sendo chamada sem ser declarada "
+		print "ERRO: Função " + node.value + " sendo chamada sem ser declarada."
 
 
 	def args_chamadaFunc(self, node, args, escopo):
@@ -377,7 +413,7 @@ class Semantica():
 						return tipo		
 
 				elif folha.type == "numero":
-					tipo = self.getTypeNum(float(folha.value))
+					tipo = self.getTypeNum(folha.value)
 					return tipo
 					
 		else:
@@ -391,29 +427,78 @@ class Semantica():
 			
 	def lista_parametros(self, node, args): # Obtem os parâmetros de uma função
 		for no in node.child:
-			y = self.descerTree(no)
+			if no.type == "lista_parametros":
+				args = self.lista_parametros(no, args)
+			y = self.descerTree(no)			
 			if y.type != "lista_parametros":
 				args.append(y.type)
+				return args # Retorna um vetor de tipos
 			else:
 				args = self.lista_parametros(y, args)
-		return args # Retorna um vetor de tipos
+
+	def lista_argumentos(self, node, escopo, args):
+	
+
+		for no in node.child:
+			
+			if args is None:
+				print "ERRO: Lista de argumentos inválidos."
+			y = self.descerTree(no)
+			
+			if y.type == "expressao_simples":
+				tipo = self.expressao_simples(y, escopo)
+				if tipo == "flutuante" or tipo == "inteiro":
+					args.append(tipo)
+					args.append(tipo)
+					return args # Retorna um vetor de tipos
+			elif y.type == "expressao_multiplicativa":
+				tipo = self.expressao_multiplicativa(y, escopo)
+				if tipo == "flutuante" or tipo == "inteiro":
+					args.append(tipo)
+					args.append(tipo)
+					return args # Retorna um vetor de tipos
+			elif y.type == "expressao_aditiva":
+				tipo = self.expressao_aditiva(y, escopo)
+				if tipo == "flutuante" or tipo == "inteiro":
+					args.append(tipo)
+					args.append(tipo)
+					return args # Retorna um vetor de tipos
+			elif y.type == "expressao_unaria":
+				tipo = self.expressao_unaria(y, escopo)
+				if tipo == "flutuante" or tipo == "inteiro":
+					args.append(tipo)
+					args.append(tipo)
+					return args # Retorna um vetor de tipos
+			elif y.type == "var":
+				tipo = self.searchSymbolsTable(y.value, escopo)
+				args.append(tipo)
+			elif y.type == "numero":
+				tipo = self.getTypeNum(y.value)
+				args.append(tipo)
+				return args # Retorna um vetor de tipos
+			
+			else:
+				args = self.lista_argumentos(y,escopo ,args)
+			return args
+
 
 	### Helpers ###
 
-	def getTypeVar(self, var):
-		for node in self.symbols:
-			if node.valor == var.value:
-				return node.tipo
-		print "Erro: Variável " + var.value + " sendo utilizada sem ser declarada"
-
 	def getTypeNum(self, num):
-		if num % 1 == 0:
-			return 'inteiro'
-		else:
-			return 'flutuante'
+
+		try:
+			num = int(num)
+		except Exception:
+			num = float(num)
+
+		if type(num) == float:
+			return "flutuante"
+		elif type(num) == int:
+			return "inteiro"
+		 	
 
 	def descerTree(self, node):
-		while node is not None and len(node.child) == 1 and node.type != "var":
+		while node is not None and len(node.child) == 1 and node.type != "var" and node.type != "chamada_funcao":
 			node = node.child[0]
 		return node
 	
@@ -426,7 +511,7 @@ class Semantica():
 		if y.type == "var":
 			tipo = self.searchSymbolsTable(y.value, escopo)
 		elif y.type == "numero":
-			tipo = self.getTypeNum(float(y.value))
+			tipo = self.getTypeNum(y.value)
 		elif y.type == "expressao_simples":
 			tipo = self.expressao_simples(y, escopo)
 		elif y.type == "expressao_aditiva":
