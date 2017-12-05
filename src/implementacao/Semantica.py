@@ -39,14 +39,20 @@ class Semantica():
 	"""Analisador sintático"""
 
 	def __init__(self, code):
+		
+		# Inicializa tabelas
 		self.symbols = []
 		self.funcs = []
+
+		# Análises semânticas / Geração de código
 		parser = Parser(code)
+		self.ast = parser.ast
 		self.criarSimb("global", parser.ast)
 		self.verificarEstruturas("global", parser.ast) 				# Gera a tabela de símbolos
 		self.verificarPrincipal()								# Verifica se a função Principal foi declarada
 		self.verificarUtilizacao()								# Verifica se as variáveis foram inicializadas e não utilizadas
 		self.verificarRetornos()
+		
 
 ## Início Geração da tabela de símbolos ##
 
@@ -77,16 +83,19 @@ class Semantica():
 		
 	def lista_variaveis(self, node, escopo, tipo):
 		estrutura = "var"
-		if len(node.child) == 2:
+		if len(node.child) == 2: # Verifica se é um vetor
 			if len(node.child[1].child) > 0:
 				if node.child[1].child[0].type == "indice":
 					estrutura = "array"				
 			no = Node(escopo, tipo, node.child[1].value, estrutura)
+
 			self.symbols.append(no)
 			self.lista_variaveis(node.child[0], escopo, tipo)
 		else:
 			no = Node(escopo, tipo, node.child[0].value, estrutura)
 			self.symbols.append(no)
+			var = ''
+			
 			return
 
 ## Fim funções Geração da tabela de símbolos ##
@@ -153,6 +162,7 @@ class Semantica():
 		funcao = Function(tipo, nome, args)
 		self.funcs.append(funcao)
 
+		
 
 	def cabecalho(self, node, args):
 		if node is None:
