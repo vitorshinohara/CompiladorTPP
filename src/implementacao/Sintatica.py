@@ -344,7 +344,7 @@ class Parser:
 		operador_multiplicacao : MULTIPLICACAO
 								| DIVISAO
 		'''
-		p[0] = Tree('operador_multiplicacao', [])
+		p[0] = Tree('operador_multiplicacao', [], str(p[1]))
 
 	def p_fator(self, p):
 		'''
