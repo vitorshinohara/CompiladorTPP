@@ -10,7 +10,7 @@ class GenCode(object):
 		self.semantica = Semantica(code)
 		self.arvore = self.semantica.ast
 		self.module = ir.Module('meu_modulo.bc')
-
+		self.variaveis = []
 		self.iterar(self.arvore)
 
 		arquivo = open('vars.ll', 'w')
@@ -30,7 +30,7 @@ class GenCode(object):
 
 
 	def declaracao_funcao(self,node):
-
+		self.variaveis = []
 		if len(node.child) > 1:
 			nome = node.child[1].value
 			tipo = node.child[0].type
@@ -91,7 +91,6 @@ class GenCode(object):
 		
 		else:
 			nome = node.child[0].value
-
 			if tipo == 'inteiro':
 				# Aloca uma variável inteira na memória
 				var = builder.alloca(ir.IntType(32), name=nome)
@@ -99,6 +98,7 @@ class GenCode(object):
 				var.align = 4
 				#num0 = ir.Constant(ir.IntType(32),0)
 				#builder.store(num0,var)
+				self.variaveis.append(var)
 
 			elif tipo == 'flutuante':
 				# Aloca uma variável inteira na memória
@@ -107,8 +107,8 @@ class GenCode(object):
 				var.align = 4
 				#num0 = ir.Constant(ir.FloatType(),0)
 				#builder.store(num0,var)
-				
-			return
+				self.variaveis.append(var)
+
 
 	def atribuicao(self, node, builder):
 		arr = []
@@ -127,8 +127,114 @@ class GenCode(object):
 		if node.child[1].type == 'expressao_unaria':
 			arr = self.expressao_unaria(node.child[1], arr)
 
+		# Retorna um array de operalções [a,a,+,b] > a = a + b
 		print arr
-		print "---------"
+
+
+		if len(arr) == 2:								# variavel = 1
+			x = self.searchVarTable(arr[0])				# ^          ^
+			atribuida = builder.load(x, "")				# x         var
+			arr.pop(0)
+			var = self.searchVarTable(arr[0])
+			var = self.genCodeTypes(var, builder)
+			builder.store(var, x)
+
+
+		elif len(arr) >= 3: # Se o vetor tiver 3 elementos (i+2)
+			
+			x = self.searchVarTable(arr[0]) # Procura pela variável a ser atribuida
+			arr.pop(1)	
+			temp = self.resolverArray(builder, arr)
+			
+			builder.store(temp, x) # Armazena o resultado da operação no x
+		
+
+
+	def resolverArray(self, builder, arr):
+		print "============================================="
+		print arr
+		print "============================================="
+		temp = None
+		if len(arr) >= 3:
+			#  w + 1
+			#    ^
+			operador = arr[1]
+			busca = self.searchVarTable(arr[0])
+			if str(busca.type) == ('i32*'):
+			#  w  +  1
+			#  ^   	 ^
+			# var1  var2
+				var1 = self.searchVarTable(arr[0]) # Procura pela variável
+				var2 = self.searchVarTable(arr[2])
+
+				var1 = self.genCodeTypes(var1, builder) # Faz o load ou cria constante
+				var2 = self.genCodeTypes(var2, builder)	# builder.load(var,'') ou ir.Constant
+
+				if operador == '+':
+					# Operação de soma
+					temp = builder.add(var1,var2, name='tempadd', flags=())
+				elif operador == '-':
+					# Operação de subtração
+					temp = builder.sub(var1, var2, name='tempsub', flags=())
+
+				elif operador == '/':
+					# Operação de divisão
+					temp = builder.udiv(var1, var2, name='tempdiv', flags=())
+				elif operador == '*':
+					# Operação de multiplicação
+					temp = builder.mul(var1, var2, name='tempmul', flags=())
+				
+				return temp
+
+
+
+	def printarVars(self):
+		for x in self.variaveis:
+			print x.name
+
+	def searchVarTable(self, var): # Procura a variável na tabela ou faz conversões
+		for x in self.variaveis:
+			if x.name == var:
+				return x
+		try:
+			var = int(var)
+			return var
+		except Exception as e:
+			try:
+				var = float(var)
+				return var
+			except Exception as e:
+				pass
+
+	def genCodeTypes(self, var, builder): # Faz o load ou cria constantes
+		if type(var) == int:
+			print "----------------------------"
+			num = ir.Constant(ir.IntType(32), var)
+			return num
+		elif type(var) == float:
+			print var
+			num = ir.Constant(ir.FloatType(), var)
+			return num
+		else:
+			load = builder.load(var, '')
+			return load
+
+	def stringToNumber(self, x):
+		try:
+			x = int(x)
+			return x
+		except Exception as e:
+			try:
+				x = float(x)
+				return x
+			except Exception as e:
+				pass
+
+	def getType(self, var):
+		for x in self.variaveis:
+			if var == x.name:
+				return x.type
+		
 
 
 	def expressao(self, node, arr):
