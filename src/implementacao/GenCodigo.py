@@ -11,7 +11,10 @@ class GenCode(object):
 		self.arvore = self.semantica.ast
 		self.module = ir.Module('meu_modulo.bc')
 		self.variaveis = []
+		self.variaveisGlobais = []
+		self.escopo = "global"
 		self.iterar(self.arvore)
+		self.funcllvm = ''
 
 		arquivo = open('vars.ll', 'w')
 		arquivo.write(str(self.module))
@@ -22,6 +25,9 @@ class GenCode(object):
 
 	def iterar(self, node):
 		if node != None:
+			if node.type == 'declaracao_variaveis' and self.escopo == 'global':
+				self.variavelGlobal(node)
+
 			if node.type == 'declaracao_funcao':
 				self.declaracao_funcao(node)
 
@@ -30,9 +36,11 @@ class GenCode(object):
 
 
 	def declaracao_funcao(self,node):
-		self.variaveis = []
+		self.variaveis = self.variaveisGlobais
+
 		if len(node.child) > 1:
 			nome = node.child[1].value
+			self.escopo = nome
 			tipo = node.child[0].type
 
 			if tipo == 'inteiro':
@@ -49,25 +57,52 @@ class GenCode(object):
 
 		# Cria a função
 		func = ir.Function(self.module, t_func, nome) 
+		self.funcllvm = func
 		# Cria o bloco de entrada e saida da função
 		entryBlock = func.append_basic_block('entry'+nome)
-		endBasicBlock = func.append_basic_block('exit'+nome)
 		# Adiciona o bloco de entrada da função
 		builder = ir.IRBuilder(entryBlock)
-
+		
 		self.iterar_corpo(node, builder)
-
+		
 		# Adiciona o bloco de saida
+		endBasicBlock = func.append_basic_block('exit'+nome)
+		# Cria um salto para o bloco de saída
+		builder.branch(endBasicBlock)
+
 		builder.position_at_end(endBasicBlock)
 
 
-	def iterar_corpo(self, node, builder):
+
+	def variavelGlobal(self, node): # Define variáveis globais
+		tipo = node.child[0].type
+		nome = node.child[1].child[0].value
+		if tipo == 'inteiro':
+			globalVar = ir.GlobalVariable(self.module, ir.IntType(32), nome)
+			globalVar.initializer = ir.Constant(ir.IntType(32), 0)
+			globalVar.linkage = 'common'
+			globalVar.align = 4
+		
+		elif tipo == 'flutuante':
+			globalVar = ir.GlobalVariable(self.module, ir.FloatType(), nome)
+			globalVar.initializer = ir.Constant(ir.FloatType(), 0)
+			globalVar.linkage = 'common'
+			globalVar.align = 4
+
+		self.variaveisGlobais.append(globalVar)
+
+
+	def iterar_corpo(self, node, builder): # Itera o corpo de uma função
 		if node != None:
 			if node.type == 'declaracao_variaveis':
 				self.declaracao_variavel(node, builder)
 
 			if node.type == 'atribuicao':
 				self.atribuicao(node, builder)
+
+			if node.type == 'se':
+				self.se(node, builder)
+
 
 			for son in node.child:
 				self.iterar_corpo(son, builder)
@@ -105,8 +140,6 @@ class GenCode(object):
 				var = builder.alloca(ir.FloatType(), name=nome)
 				# Define o alinhamento dela
 				var.align = 4
-				#num0 = ir.Constant(ir.FloatType(),0)
-				#builder.store(num0,var)
 				self.variaveis.append(var)
 
 
@@ -128,7 +161,6 @@ class GenCode(object):
 			arr = self.expressao_unaria(node.child[1], arr)
 
 		# Retorna um array de operalções [a,a,+,b] > a = a + b
-		print arr
 
 
 		if len(arr) == 2:								# variavel = 1
@@ -151,9 +183,9 @@ class GenCode(object):
 
 
 	def resolverArray(self, builder, arr):
-		print "============================================="
-		print arr
-		print "============================================="
+		# print "============================================="
+		# print arr
+		# print "============================================="
 		temp = None
 		if len(arr) >= 3:
 			#  w + 1
@@ -186,16 +218,84 @@ class GenCode(object):
 				
 				return temp
 
+	def se(self, node, builder):
 
+		# 2 SE expressao ENTÃO corpo
+		#			^			^
+		#			child[0]	child[1]
 
-	def printarVars(self):
-		for x in self.variaveis:
-			print x.name
+		# SE expressao ENTAO corpo SENAO corpo
+		#		^				^			^
+		#	child[0]		child[1]	child[2]
+
+		arr = self.expressao(node.child[0], [])
+
+		if len(node.child) == 2:
+			
+			predicate = self.funcllvm.append_basic_block('predicate')
+			then = self.funcllvm.append_basic_block('then')
+			merge = self.funcllvm.append_basic_block('merge')
+
+			# Predicate block > verificacao condicao if
+			builder.position_at_end(predicate)
+			# Obtem a referencia da var
+			var_cmp = self.searchVarTable(arr[0])
+			var_cmp2 = self.searchVarTable(arr[0])
+			# Aloca na memória
+			var_cmp = self.genCodeTypes(var_cmp, builder)
+			var_cmp2 = self.genCodeTypes(var_cmp2, builder)
+			# Compara var_cmp e var_cmp2
+			cmp = builder.icmp_unsigned( arr[1] ,var_cmp, var_cmp2, 'cmp')
+			# Realiza o salto para determinado bloco
+			builder.select(cmp, then, merge)
+
+			# Bloco then
+			builder.position_at_end(then)
+			self.iterar_corpo(node.child[1], builder)
+			builder.branch(merge)
+			builder.position_at_end(merge)
+		
+		# SE expressao ENTAO corpo SENAO corpo
+		#		^				^			^
+		#	child[0]		child[1]	child[2]
+
+		else: # 
+			predicate = self.funcllvm.append_basic_block('predicate')
+			then = self.funcllvm.append_basic_block('then')
+			elsee = self.funcllvm.append_basic_block('else')
+			merge = self.funcllvm.append_basic_block('merge')
+
+			# Predicate block > verificacao condicao if
+			builder.position_at_end(predicate)
+			# Obtem a referencia da var
+			var_cmp = self.searchVarTable(arr[0])
+			var_cmp2 = self.searchVarTable(arr[0])
+			# Aloca na memória
+			var_cmp = self.genCodeTypes(var_cmp, builder)
+			var_cmp2 = self.genCodeTypes(var_cmp2, builder)
+			# Compara var_cmp e var_cmp2
+			cmp = builder.icmp_unsigned( arr[1] ,var_cmp, var_cmp2, 'cmp')
+			# Realiza o salto para determinado bloco
+			builder.cbranch(cmp, then, elsee)
+
+			# Bloco then
+			builder.position_at_end(then)
+			self.iterar_corpo(node.child[1], builder)
+			builder.branch(merge)
+			
+			builder.position_at_end(elsee)
+			self.iterar_corpo(node.child[2], builder)
+			builder.branch(merge)
+
+			# Fim do if
+			builder.position_at_end(merge)		
+
 
 	def searchVarTable(self, var): # Procura a variável na tabela ou faz conversões
 		for x in self.variaveis:
-			if x.name == var:
+			if x.name == str(var):
 				return x
+
 		try:
 			var = int(var)
 			return var
@@ -208,11 +308,9 @@ class GenCode(object):
 
 	def genCodeTypes(self, var, builder): # Faz o load ou cria constantes
 		if type(var) == int:
-			print "----------------------------"
 			num = ir.Constant(ir.IntType(32), var)
 			return num
 		elif type(var) == float:
-			print var
 			num = ir.Constant(ir.FloatType(), var)
 			return num
 		else:
