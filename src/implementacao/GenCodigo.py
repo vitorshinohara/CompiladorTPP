@@ -22,7 +22,6 @@ class GenCode(object):
 		print(self.module)
 
 
-
 	def iterar(self, node):
 		if node != None:
 			if node.type == 'declaracao_variaveis' and self.escopo == 'global':
@@ -35,13 +34,14 @@ class GenCode(object):
 				self.iterar(son)
 
 
-	def declaracao_funcao(self,node):
-		self.variaveis = self.variaveisGlobais
+	def declaracao_funcao(self,node): # Declaração de uma função
 
-		if len(node.child) > 1:
+		self.variaveis = self.variaveisGlobais # Zera a tabela de variaveis da função, deixa só variraveis globais
+
+		if len(node.child) > 1: # Função com retorno
 			nome = node.child[1].value
-			self.escopo = nome
-			tipo = node.child[0].type
+			self.escopo = nome # Escopo recebe o nome da função
+			tipo = node.child[0].type # Tipo da função <inteiro\float>
 
 			if tipo == 'inteiro':
 				# Cria um retorno de tipo inteiro
@@ -51,7 +51,7 @@ class GenCode(object):
 				t_func = ir.FunctionType(ir.FloatType(), ())
 		
 		else:
-			nome = node.child[0].value
+			nome = node.child[0].value # Função void
 			# Cria um retorno de tipo void
 			t_func = ir.FunctionType(ir.VoidType(), ())
 
@@ -62,34 +62,38 @@ class GenCode(object):
 		entryBlock = func.append_basic_block('entry'+nome)
 		# Adiciona o bloco de entrada da função
 		builder = ir.IRBuilder(entryBlock)
-		
+		# Itera sobre o corpo da função
 		self.iterar_corpo(node, builder)
-		
 		# Adiciona o bloco de saida
 		endBasicBlock = func.append_basic_block('exit'+nome)
 		# Cria um salto para o bloco de saída
 		builder.branch(endBasicBlock)
-
+		# Adiciona bloco de saída no final da função
 		builder.position_at_end(endBasicBlock)
 
 
-
 	def variavelGlobal(self, node): # Define variáveis globais
-		tipo = node.child[0].type
-		nome = node.child[1].child[0].value
-		if tipo == 'inteiro':
+		tipo = node.child[0].type   # Armazena o tipo da var
+		nome = node.child[1].child[0].value # Armazena o nome
+		if tipo == 'inteiro': # Declara caso seja inteiro
 			globalVar = ir.GlobalVariable(self.module, ir.IntType(32), nome)
+			# Reailiza inicialização da variavel global = 0
 			globalVar.initializer = ir.Constant(ir.IntType(32), 0)
+			# Define o linkage para common > variavel global
 			globalVar.linkage = 'common'
-			globalVar.align = 4
-		
-		elif tipo == 'flutuante':
-			globalVar = ir.GlobalVariable(self.module, ir.FloatType(), nome)
-			globalVar.initializer = ir.Constant(ir.FloatType(), 0)
-			globalVar.linkage = 'common'
+			# Alinhamento
 			globalVar.align = 4
 
-		self.variaveisGlobais.append(globalVar)
+		elif tipo == 'flutuante': # Declara caso seja flutuante
+			globalVar = ir.GlobalVariable(self.module, ir.FloatType(), nome)
+			# Reailiza inicialização da variavel global = 0
+			globalVar.initializer = ir.Constant(ir.FloatType(), 0)
+			# Define o linkage para common > variavel global
+			globalVar.linkage = 'common'
+			# Alinhamento
+			globalVar.align = 4
+		# Adiciona var global na lista de var globais
+		self.variaveisGlobais.append(globalVar) # Adiciona var global na lista de var globais
 
 
 	def iterar_corpo(self, node, builder): # Itera o corpo de uma função
@@ -103,9 +107,31 @@ class GenCode(object):
 			if node.type == 'se':
 				self.se(node, builder)
 
+			if node.type == 'repita':
+				self.repita(node, builder)
+
 
 			for son in node.child:
 				self.iterar_corpo(son, builder)
+
+
+
+	def repita(self, node, build):
+		entry = self.funcllvm.append_basic_block('entry_repita')
+		body = self.funcllvm.append_basic_block('body')
+		endloop = self.funcllvm.append_basic_block('endloop')
+		
+		# Adiciona o bloco de entrada
+		builder.position_at_end(entry)
+		
+		# Salta para o bloco body
+		builder.branch(body)
+
+		# Itera dentro do corpo repita
+		self.iterar_corpo(node, builder)
+
+
+
 
 
 	def declaracao_variavel(self, node, builder):
