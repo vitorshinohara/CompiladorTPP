@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from sys import argv, exit
+from sys import argv
 from Semantica import Semantica
 from llvmlite import ir
 
@@ -56,16 +56,16 @@ class GenCode(object):
 			t_func = ir.FunctionType(ir.VoidType(), ())
 
 		# Cria a função
-		func = ir.Function(self.module, t_func, nome) 
+		func = ir.Function(self.module, t_func, nome)
 		self.funcllvm = func
 		# Cria o bloco de entrada e saida da função
-		entryBlock = func.append_basic_block('entry'+nome)
+		entryBlock = func.append_basic_block('entry' + nome)
 		# Adiciona o bloco de entrada da função
 		builder = ir.IRBuilder(entryBlock)
 		# Itera sobre o corpo da função
 		self.iterar_corpo(node, builder)
 		# Adiciona o bloco de saida
-		endBasicBlock = func.append_basic_block('exit'+nome)
+		endBasicBlock = func.append_basic_block('exit' + nome)
 		# Cria um salto para o bloco de saída
 		builder.branch(endBasicBlock)
 		# Adiciona bloco de saída no final da função
@@ -97,42 +97,74 @@ class GenCode(object):
 
 
 	def iterar_corpo(self, node, builder): # Itera o corpo de uma função
-		if node != None:
+		if node is not None:
+			# Se o nó for do tipo declaracao_variaveis
 			if node.type == 'declaracao_variaveis':
+				# Função que aloca na memória as variaveis
 				self.declaracao_variavel(node, builder)
 
+			# Se o nó for do tipo atribuição
 			if node.type == 'atribuicao':
+				# Aloca variáveis na memória e faz atribuições
 				self.atribuicao(node, builder)
 
+			# Se o nó for do tipo se [DEVE SER TESTADO]
 			if node.type == 'se':
+				# Adiciona o se no código llvm
 				self.se(node, builder)
 
+			# Se o nó for do tipo repita [DEVE SER TESTADO]
 			if node.type == 'repita':
+				# Adiciona as operações para se realizar um loop
 				self.repita(node, builder)
-
 
 			for son in node.child:
 				self.iterar_corpo(son, builder)
 
 
 
-	def repita(self, node, build):
-		entry = self.funcllvm.append_basic_block('entry_repita')
+	def repita(self, node, builder):
+		# Declara o bloco do predicado (verificação do laço)
+		predicate = self.funcllvm.append_basic_block('predicate')
+		# Declara o bloco do corpo
 		body = self.funcllvm.append_basic_block('body')
+		# Declara o bloco do fim do loop
 		endloop = self.funcllvm.append_basic_block('endloop')
-		
-		# Adiciona o bloco de entrada
-		builder.position_at_end(entry)
-		
+				
 		# Salta para o bloco body
 		builder.branch(body)
+		# Coloca o bloco do corpo
+		builder.position_at_end(body)
 
 		# Itera dentro do corpo repita
 		self.iterar_corpo(node, builder)
+		# Salta para o bloco do predicado
+		builder.branch(predicate)
+		# Coloca o bloco do predicado
+		builder.position_at_end(predicate)
+		# Faz a comparação
 
+		# Filho contém a expressão do predicado
+		filho = node.child[1]
+		
+		# Obtem o array da expressao
+		# Ex: [a,<,100]
+		arr = self.expressao(filho, [])
 
+		if len(arr) == 3:
+			# Obtem a referencia da var
+			var_cmp = self.searchVarTable(arr[0])
+			var_cmp2 = self.searchVarTable(arr[2])
+			# Aloca na memória
+			var_cmp = self.genCodeTypes(var_cmp, builder)
+			var_cmp2 = self.genCodeTypes(var_cmp2, builder)
+			# Compara var_cmp e var_cmp2
+			cmp = builder.icmp_unsigned(arr[1], var_cmp, var_cmp2, 'cmp')
+			# Realiza o salto para determinado bloco
+			builder.select(cmp, body, endloop)
 
-
+		builder.position_at_end(endloop)
+			
 
 	def declaracao_variavel(self, node, builder):
 		tipo = node.child[0].type
@@ -141,14 +173,13 @@ class GenCode(object):
 	def lista_variaveis(self, node, tipo, builder):
 
 		if len(node.child) == 2: # Verifica se é um vetor
-			if len(node.child[1].child) > 0:
-				if node.child[1].child[0].type == "indice":
-					estrutura = "array"				
-
-			#no = Node(escopo, tipo, node.child[1].value, estrutura)
-
-				
-			self.lista_variaveis(node.child[0], tipo, builder)
+			# if len(node.child[1].child) > 0:
+				# if node.child[1].child[0].type == "indice":
+					# estrutura = "array"
+			
+			# no = Node(escopo, tipo, node.child[1].value, estrutura)
+			# self.lista_variaveis(node.child[0], tipo, builder)
+			pass
 		
 		else:
 			nome = node.child[0].value
@@ -157,8 +188,8 @@ class GenCode(object):
 				var = builder.alloca(ir.IntType(32), name=nome)
 				# Define o alinhamento dela
 				var.align = 4
-				#num0 = ir.Constant(ir.IntType(32),0)
-				#builder.store(num0,var)
+				# num0 = ir.Constant(ir.IntType(32),0)
+				# builder.store(num0,var)
 				self.variaveis.append(var)
 
 			elif tipo == 'flutuante':
@@ -191,7 +222,7 @@ class GenCode(object):
 
 		if len(arr) == 2:								# variavel = 1
 			x = self.searchVarTable(arr[0])				# ^          ^
-			atribuida = builder.load(x, "")				# x         var
+			builder.load(x, "")							# x         var
 			arr.pop(0)
 			var = self.searchVarTable(arr[0])
 			var = self.genCodeTypes(var, builder)
@@ -201,7 +232,7 @@ class GenCode(object):
 		elif len(arr) >= 3: # Se o vetor tiver 3 elementos (i+2)
 			
 			x = self.searchVarTable(arr[0]) # Procura pela variável a ser atribuida
-			arr.pop(1)	
+			arr.pop(1)
 			temp = self.resolverArray(builder, arr)
 			
 			builder.store(temp, x) # Armazena o resultado da operação no x
@@ -209,9 +240,7 @@ class GenCode(object):
 
 
 	def resolverArray(self, builder, arr):
-		# print "============================================="
-		# print arr
-		# print "============================================="
+		# Inicializa variável temporária
 		temp = None
 		if len(arr) >= 3:
 			#  w + 1
@@ -219,9 +248,9 @@ class GenCode(object):
 			operador = arr[1]
 			busca = self.searchVarTable(arr[0])
 			if str(busca.type) == ('i32*'):
-			#  w  +  1
-			#  ^   	 ^
-			# var1  var2
+				#  w  +  1
+				#  ^   	 ^
+				# var1  var2
 				var1 = self.searchVarTable(arr[0]) # Procura pela variável
 				var2 = self.searchVarTable(arr[2])
 
@@ -230,7 +259,7 @@ class GenCode(object):
 
 				if operador == '+':
 					# Operação de soma
-					temp = builder.add(var1,var2, name='tempadd', flags=())
+					temp = builder.add(var1, var2, name='tempadd', flags=())
 				elif operador == '-':
 					# Operação de subtração
 					temp = builder.sub(var1, var2, name='tempsub', flags=())
@@ -266,7 +295,7 @@ class GenCode(object):
 			builder.position_at_end(predicate)
 			# Obtem a referencia da var
 			var_cmp = self.searchVarTable(arr[0])
-			var_cmp2 = self.searchVarTable(arr[0])
+			var_cmp2 = self.searchVarTable(arr[2])
 			# Aloca na memória
 			var_cmp = self.genCodeTypes(var_cmp, builder)
 			var_cmp2 = self.genCodeTypes(var_cmp2, builder)
@@ -434,7 +463,7 @@ if __name__ == '__main__':
 		f = open(argv[1])
 		genCode = GenCode(f.read())
 	except IOError:
-		#raise Exception("Erro: Arquivo não encontrado. Verifique se o nome ou diretório está correto.")
+		# raise Exception("Erro: Arquivo não encontrado. Verifique se o nome ou diretório está correto.")
 		print "Erro: Arquivo não encontrado. Verifique se o nome ou diretório está correto."
 		
 
