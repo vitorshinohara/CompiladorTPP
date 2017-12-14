@@ -218,19 +218,32 @@ class Parser:
 		'''
 		se : SE expressao ENTAO corpo FIM
 				| SE expressao ENTAO corpo SENAO corpo FIM
+				| SE ABREPAR expressao FECHAPAR ENTAO corpo SENAO corpo FIM
 		'''
 
-		if len(p) == 6:
+		if len(p) == 6: # SE expressao ENTAO corpo FIM
 			p[0] = Tree('se', [p[2], p[4]])
-		elif len(p) == 8:
+		elif len(p) == 8: # SE expressao ENTAO corpo SENAO corpo FIM
 			p[0] = Tree('se', [p[2], p[4], p[6]])
+		elif len(p) == 10: # SE ABREPAR expressao FECHAPAR ENTAO corpo SENAO corpo FIM
+			p[0] = Tree('se', [p[3], p[6], p[8]])
+
+
+	def p_se2(self, p):
+		'''
+		se : SE ABREPAR expressao FECHAPAR ENTAO corpo FIM
+		'''
+		p[0] = Tree('se', [p[3], p[6]])
 
 	def p_repita(self, p):
 		'''
 		repita : REPITA corpo ATE expressao
+				| REPITA corpo ATE ABREPAR expressao FECHAPAR
 		'''
-		p[0] = Tree('repita', [p[2], p[4]])
-
+		if len(p) == 5:
+			p[0] = Tree('repita', [p[2], p[4]])
+		elif len(p) == 7:
+			p[0] = Tree('repita', [p[2], p[5]])
 
 	def p_atribuicao(self, p):
 		'''
