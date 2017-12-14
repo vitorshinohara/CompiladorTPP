@@ -16,6 +16,7 @@ class GenCode(object):
 		self.funcs = []
 		self.iterar(self.arvore)
 		self.funcllvm = ''
+		self.endBlock = ''
 		arquivo = open('vars.ll', 'w')
 		arquivo.write(str(self.module))
 		arquivo.close()
@@ -37,6 +38,7 @@ class GenCode(object):
 
 		self.variaveis = self.variaveisGlobais # Zera a tabela de variaveis da função, deixa só variraveis globais
 		args = []
+		nomes = []
 		if len(node.child) > 1: # Função com retorno
 			nome = node.child[1].value
 			self.escopo = nome # Escopo recebe o nome da função
@@ -44,7 +46,6 @@ class GenCode(object):
 				# Passa o nó da lista de argumentos
 				args = self.getArgsFunc(node.child[1].child[0], [])
 				nomes = self.getArgsFuncName(node.child[1].child[0], [])
-
 			tipo = node.child[0].type # Tipo da função <inteiro\float>
 
 			if tipo == 'inteiro':
@@ -57,12 +58,12 @@ class GenCode(object):
 		else:
 			nome = node.child[0].value # Função void
 			self.escopo = nome
+
 			# Verifica se existe argumentos na função
 			if node.child[0].child[0] is not None:
 				# Obtem os argumentos
 				args = self.getArgsFunc(node.child[0].child[0], [])
-				nomes = self.getArgsFuncName(node.child[1].child[0], [])
-
+				nomes = self.getArgsFuncName(node.child[0].child[0], [])
 			# Cria um retorno de tipo void
 			t_func = ir.FunctionType(ir.VoidType(), (args))
 
@@ -72,9 +73,6 @@ class GenCode(object):
 		self.funcs.append(func)
 		# Obtem os argumentos da função
 		argumentos_llvm = func.args
-		
-		if len(argumentos_llvm) > 0:
-			print argumentos_llvm[0].type
 
 		# Define qual função o código vai utilizar na iteração do corpo
 		self.funcllvm = func
@@ -85,28 +83,27 @@ class GenCode(object):
 		# Percorre a lista de parâmetros do tipo args llvm
 		for x in range(0,len(argumentos_llvm)):
 			# Se o argumento for do tipo inteiro
-			
 			if str(argumentos_llvm[x].type) == 'i32':
 				#  Aloca a variável inteira com o nome do argumento referente ao mesmo
-				var = builder.alloca(ir.IntType(32), str(nomes[x]))
+				var = builder.alloca(ir.IntType(32), name=str(nomes[x]))
+				var.align = 4
 				self.variaveis.append(var)
 
 			# Se o argumento for do tipo flutuante
 			elif str(argumentos_llvm[x].type) == 'float':
-				print nomes[x]
 				#  Aloca a variável float com o nome do argumento referente ao mesmo
-				var = builder.alloca(ir.FloatType(), str(nomes[x]))
+				var = builder.alloca(ir.FloatType(), name=str(nomes[x]))
+				var.align = 4
 				self.variaveis.append(var)
 		
+		# Adiciona o bloco de saida
 		# Itera sobre o corpo da função
 		self.iterar_corpo(node, builder)
-		# Adiciona o bloco de saida
+		# Depois de iterar e adicionar todas estruturas, adiciona o return
 		endBasicBlock = func.append_basic_block('exit' + nome)
-		# Cria um salto para o bloco de saída
-		builder.branch(endBasicBlock)
-		# Adiciona bloco de saída no final da função
-		builder.position_at_end(endBasicBlock)
-
+		self.endBlock = endBasicBlock
+		self.retorna(node, builder)
+		
 	def getArgsFunc(self, node, args):
 		# Recursão para os filhos
 		if len(node.child) > 1:
@@ -126,6 +123,7 @@ class GenCode(object):
 		if len(node.child) > 1:
 			for son in node.child:
 				args = self.getArgsFuncName(son, args)
+			return args
 				
 		else:
 			if node.type == 'lista_parametros':
@@ -180,8 +178,110 @@ class GenCode(object):
 			if node.type == 'chamada_funcao':
 				self.chamada_funcao(node, builder)
 
-			for son in node.child:
-				self.iterar_corpo(son, builder)
+			if node.type == 'escreva':
+				self.escreva(node, builder) # Função escreva
+
+			if node.type == 'leia':
+				self.leia(node, builder)
+
+			else:
+				for son in node.child:
+					self.iterar_corpo(son, builder)
+
+	def retorna(self, node, builder):
+		if node is not None:
+			pass
+			if node.type == 'retorna':
+
+				if node.child[0].type == 'expressao':
+					arr = self.expressao(node.child[0], [])
+					if len(arr) == 1:
+						var = self.searchVarTable(arr[0])
+						print type(var)
+						if type(var) == int or type(var) == float:
+							var = self.genCodeTypes(var, builder)
+
+						builder.branch(self.endBlock)
+						builder.position_at_end(self.endBlock)
+						builder.ret(var)
+					elif len(arr) == 3:
+						var = self.resolverArray(arr)
+						builder.branch(self.endBlock)
+						builder.position_at_end(self.endBlock)
+						builder.ret(var)
+			else:
+				for son in node.child:
+					self.retorna(son, builder)
+
+	def leia(self, node, builder):
+		try:
+			# Ler inteiro
+			args_int = [ir.PointerType(ir.IntType(32), 0)]
+			leia_int_t = ir.FunctionType(ir.IntType(32), args_int)
+			leia_int = ir.Function(self.module, leia_int_t, 'leia_int')
+			self.funcs.append(leia_int)
+
+			# Ler flutuante
+			args_float = [ir.PointerType(ir.FloatType(), 0)]
+
+			leia_float_t = ir.FunctionType(ir.FloatType(), args_float)
+			leia_float = ir.Function(self.module, leia_float_t, 'leia_float')
+			self.funcs.append(leia_float)
+
+		# Caso as funções leia já foram declaradas, faz a chamada das mesmas
+		except Exception as e:
+			pass
+
+		var = self.searchVarTable(node.value)
+		args = []
+		args.append(var)
+
+		if str(var.type) == 'i32*':
+
+			# Se o parâmetro passado é inteiro chama a função leia_int
+			builder.call(self.searchFunc('leia_int'), args)
+
+		elif var.type == 'float':
+			builder.call(self.searchFunc('leia_float'), args)
+
+		else:
+			print 'erro'
+
+	def escreva(self, node, builder):
+		# Tenta criar uma função com nome repita
+		try:
+			# Define o argumento da função como um ponteiro
+			args = [ir.PointerType(ir.IntType(8), 0)]
+			# Cria a função printf
+			func_t = ir.FunctionType(ir.IntType(32), args, True)
+			func = ir.Function(self.module, func_t, 'printf')
+		
+		except Exception:
+			# Se já existe, não faz nada
+			pass
+		#expressao = self.expressao(node.child[0], [])
+		
+		# LLVMValueRef formatint = LLVMBuildGlobalStringPtr(
+        # builder,
+        # "%d\n",
+        # "formatint"
+  		# );
+
+		#arg = expressao[0]
+		#vet = []
+		#var = self.searchVarTable(arg)
+		#print type(var)
+
+		#if type(var) == int:
+		# 	aux = ir.Constant(ir.IntType(32), var)
+		# 	vet.append(aux)
+		#if type(var) == float: 
+		# 	aux = ir.Constant(ir.FloatType(), var)
+		# 	vet.append(aux)
+		# 	print 'aa'
+		#print vet
+		#print "ue"
+		#builder.call(func, vet, 'escreva')
 
 	def chamada_funcao(self, node, builder):
 		if node.child[0] is None:
@@ -192,22 +292,42 @@ class GenCode(object):
 			#	function name     args  nome
 
 		else:
-			args_str = []
-			args_str = self.getArgsFuncName(node.child[0].child[0])
-			print args_str
+			# Função com argumentos
+			if node.child[0] is not None:
+				args_str = []
+				args_str = self.lista_argumentos(node.child[0], [])
+
 			args_llvm = []
 			
 			for arg in args_str:
-				# Transforma os argumentos str em llvm
-				args_llvm.append(builder.load(self.searchVarTable(arg), ""))
+				# Transforma os argumentos searchVarTablestr em llvm
+				args_llvm.append(builder.load(self.searchVarTable(arg), "temp_" + arg))
 			# Faz a chamada da função, passa os argumentos e define o nome	
 			builder.call(self.searchFunc(node.value), args_llvm, node.value)
 
+	def lista_argumentos(self, node, arr):
+		if len(node.child) > 1:
+			for son in node.child:
+				arr = self.lista_argumentos(son, arr)
+			return arr
+
+		else:
+			aux = []
+			if node.type == 'lista_argumentos':
+				aux = self.expressao(node.child[0], aux)
+
+			elif node.type == 'expressao':
+				aux = self.expressao(node, aux)
+
+			for x in aux:
+				arr.append(x)
+			return arr
+
 	def repita(self, node, builder):
 		# Declara o bloco do predicado (verificação do laço)
-		predicate = self.funcllvm.append_basic_block('predicate')
+		predicate = self.funcllvm.append_basic_block('predicate_repita')
 		# Declara o bloco do corpo
-		body = self.funcllvm.append_basic_block('body')
+		body = self.funcllvm.append_basic_block('body_repita')
 		# Declara o bloco do fim do loop
 		endloop = self.funcllvm.append_basic_block('endloop')
 				
@@ -217,7 +337,7 @@ class GenCode(object):
 		builder.position_at_end(body)
 
 		# Itera dentro do corpo repita
-		self.iterar_corpo(node, builder)
+		self.iterar_corpo(node.child[0], builder)
 		# Salta para o bloco do predicado
 		builder.branch(predicate)
 		# Coloca o bloco do predicado
@@ -238,10 +358,15 @@ class GenCode(object):
 			# Aloca na memória
 			var_cmp = self.genCodeTypes(var_cmp, builder)
 			var_cmp2 = self.genCodeTypes(var_cmp2, builder)
+			
 			# Compara var_cmp e var_cmp2
+			if arr[1] == '=':
+				arr[1] = '=='
+
 			cmp = builder.icmp_unsigned(arr[1], var_cmp, var_cmp2, 'cmp')
+
 			# Realiza o salto para determinado bloco
-			builder.select(cmp, body, endloop)
+			builder.cbranch(cmp, body, endloop)
 
 		builder.position_at_end(endloop)
 
@@ -345,6 +470,31 @@ class GenCode(object):
 				elif operador == '*':
 					# Operação de multiplicação
 					temp = builder.mul(var1, var2, name='tempmul', flags=())
+				return temp
+			
+			else:
+				#  w  +  1
+				#  ^   	 ^
+				# var1  var2
+				var1 = self.searchVarTable(arr[0]) # Procura pela variável
+				var2 = self.searchVarTable(arr[2])
+
+				var1 = self.genCodeTypes(var1, builder) # Faz o load ou cria constante
+				var2 = self.genCodeTypes(var2, builder)	# builder.load(var,'') ou ir.Constant
+
+				if operador == '+':
+					# Operação de soma
+					temp = builder.fadd(var1, var2, name='tempadd', flags=())
+				elif operador == '-':
+					# Operação de subtração
+					temp = builder.fsub(var1, var2, name='tempsub', flags=())
+
+				elif operador == '/':
+					# Operação de divisão
+					temp = builder.fdiv(var1, var2, name='tempdiv', flags=())
+				elif operador == '*':
+					# Operação de multiplicação
+					temp = builder.fmul(var1, var2, name='tempmul', flags=())
 				
 				return temp
 
@@ -362,9 +512,9 @@ class GenCode(object):
 
 		if len(node.child) == 2:
 			
-			predicate = self.funcllvm.append_basic_block('predicate')
-			then = self.funcllvm.append_basic_block('then')
-			merge = self.funcllvm.append_basic_block('merge')
+			predicate = self.funcllvm.append_basic_block('predicate_se')
+			then = self.funcllvm.append_basic_block('then_se')
+			merge = self.funcllvm.append_basic_block('merge_se')
 
 			# Predicate block > verificacao condicao if
 			builder.position_at_end(predicate)
@@ -381,7 +531,9 @@ class GenCode(object):
 
 			# Bloco then
 			builder.position_at_end(then)
+
 			self.iterar_corpo(node.child[1], builder)
+
 			builder.branch(merge)
 			builder.position_at_end(merge)
 		
@@ -390,10 +542,10 @@ class GenCode(object):
 		#	child[0]		child[1]	child[2]
 
 		else: # 
-			predicate = self.funcllvm.append_basic_block('predicate')
-			then = self.funcllvm.append_basic_block('then')
-			elsee = self.funcllvm.append_basic_block('else')
-			merge = self.funcllvm.append_basic_block('merge')
+			predicate = self.funcllvm.append_basic_block('predicate_se')
+			then = self.funcllvm.append_basic_block('then_se')
+			elsee = self.funcllvm.append_basic_block('else_se')
+			merge = self.funcllvm.append_basic_block('merge_se')
 
 			# Predicate block > verificacao condicao if
 			builder.position_at_end(predicate)
